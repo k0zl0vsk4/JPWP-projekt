@@ -72,6 +72,15 @@ public class FlightLab_Main extends Application {
                 missionActive = !missionActive;
                 if (missionActive) startTime = System.currentTimeMillis();
             }
+
+            case ESCAPE -> {
+                try {
+                    new MainMenu().start((Stage)((Scene)e.getSource()).getWindow());
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+
             default -> {
             }
         }
