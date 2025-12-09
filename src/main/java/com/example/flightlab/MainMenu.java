@@ -18,6 +18,7 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import javafx.scene.Node;
 
 public class MainMenu extends Application {
 
@@ -85,7 +86,7 @@ public class MainMenu extends Application {
         questions.add(new Question(
                 "Jaką część samolotu pokazano na ilustracji?",
                 "Lotki",
-                "Klapę",
+                "Klapy",
                 "Ster wysokości",
                 "Podwozie",
                 2,
@@ -114,73 +115,116 @@ public class MainMenu extends Application {
     }
 
     private void showQuizQuestion() {
-        if (quizIndex >= questions.size()) {
-            showQuizSummary();
-            return;
-        }
+        if (this.quizIndex >= this.questions.size()) {
+            this.showQuizSummary();
+        } else {
+            Question q = (Question)this.questions.get(this.quizIndex);
+            VBox box = new VBox((double)20.0F);
+            box.setAlignment(Pos.CENTER);
+            box.setStyle("-fx-background-color: #202020;");
 
+            Label qText = new Label(q.text);
+            qText.setFont(Font.font((double)22.0F));
+            qText.setTextFill(Color.WHITE);
+            box.getChildren().add(qText);
 
-        Question q = questions.get(quizIndex);
-
-        VBox box = new VBox(20);
-        box.setAlignment(Pos.CENTER);
-        box.setStyle("-fx-background-color: #202020;");
-
-        Label qText = new Label(q.text);
-        qText.setFont(Font.font(22));
-        qText.setTextFill(Color.WHITE);
-        box.getChildren().add(qText);
-
-        if (q.imageUrl != null) {
-
-            Image img = new Image(getClass().getResourceAsStream("/" + q.imageUrl));
-            ImageView iv = new ImageView(img);
-            iv.setFitWidth(500);
-            iv.setPreserveRatio(true);
-        }
-
-        if (q.audioUrl != null) {
-            Button playAudio = new Button("Odtwórz nagranie");
-            playAudio.setOnAction(e -> {
+            if (q.imageUrl != null) {
                 try {
-                    Media audio = new Media(getClass().getResource(q.audioUrl).toString());
-                    new MediaPlayer(audio).play();
-                } catch (Exception ex) {
-                    System.out.println("Brak pliku audio");
+                    Image img = new Image(this.getClass().getResourceAsStream("/" + q.imageUrl));
+                    ImageView iv = new ImageView(img);
+
+                    //Ustalenie wymiarów obrazu, by widoczne było pytanie i odpowiedzi
+                    iv.setFitWidth((double)300.0F);
+                    iv.setPreserveRatio(true);
+
+                    box.getChildren().add(iv);
+                } catch (Exception e) {
+                    System.out.println("Nie udało się załadować obrazu: " + q.imageUrl);
                 }
-            });
-            box.getChildren().add(playAudio);
+            }
+
+            if (q.audioUrl != null) {
+                Button playAudio = new Button("Odtwórz nagranie");
+                playAudio.setOnAction((e) -> {
+                    try {
+                        String fullPath = "/" + q.audioUrl;
+                        Media audio = new Media(this.getClass().getResource(fullPath).toString());
+                        (new MediaPlayer(audio)).play();
+                    } catch (Exception var4) {
+                        System.out.println("Brak pliku audio dla ścieżki: ");
+                    }
+                });
+                box.getChildren().add(playAudio);
+            }
+
+            Button a = new Button("A: " + q.a);
+            Button b = new Button("B: " + q.b);
+            Button c = new Button("C: " + q.c);
+            Button d = new Button("D: " + q.d);
+            a.setOnAction((e) -> this.checkAnswer(1));
+            b.setOnAction((e) -> this.checkAnswer(2));
+            c.setOnAction((e) -> this.checkAnswer(3));
+            d.setOnAction((e) -> this.checkAnswer(4));
+
+            VBox answers = new VBox((double)10.0F, new Node[]{a, b, c, d});
+            answers.setAlignment(Pos.CENTER);
+
+            Button back = new Button("Powrót do menu");
+            back.setOnAction((e) -> this.window.setScene(this.menuScene));
+            back.setPrefWidth((double)200.0F);
+
+            box.getChildren().addAll(new Node[]{answers, back});
+
+            this.quizScene = new Scene(box, (double)1000.0F, (double)700.0F);
+            this.window.setScene(this.quizScene);
         }
-
-        Button a = new Button("A: " + q.a);
-        Button b = new Button("B: " + q.b);
-        Button c = new Button("C: " + q.c);
-        Button d = new Button("D: " + q.d);
-
-        a.setOnAction(e -> checkAnswer(1));
-        b.setOnAction(e -> checkAnswer(2));
-        c.setOnAction(e -> checkAnswer(3));
-        d.setOnAction(e -> checkAnswer(4));
-
-        VBox answers = new VBox(10, a, b, c, d);
-        answers.setAlignment(Pos.CENTER);
-
-        Button back = new Button("Powrót do menu");
-        back.setOnAction(e -> window.setScene(menuScene));
-        back.setPrefWidth(200);
-
-        box.getChildren().addAll(answers, back);
-
-        quizScene = new Scene(box, 1000, 700);
-        window.setScene(quizScene);
     }
 
     private void checkAnswer(int chosen) {
-        if (chosen == questions.get(quizIndex).correct)
-            score++;
+        Question currentQ = this.questions.get(this.quizIndex);
+        boolean isCorrect = (chosen == currentQ.correct);
+        if (isCorrect) {
+            ++this.score;
+        }
 
-        quizIndex++;
-        showQuizQuestion();
+        showFeedback(isCorrect, currentQ);
+    }
+
+    private void showFeedback(boolean correct, Question q) {
+        VBox feedbackBox = new VBox(20.0);
+        feedbackBox.setAlignment(Pos.CENTER);
+        feedbackBox.setStyle(correct ? "-fx-background-color: #27A65B;" : "-fx-background-color: #C0392B;");
+
+        Label status = new Label(correct ? "DOBRZE!" : "ŹLE!");
+        status.setFont(Font.font(36.0));
+        status.setTextFill(Color.WHITE);
+
+        if (!correct) {
+            Label explanation = new Label("Poprawna odpowiedź: " + getAnswerText(q.correct) + ".");
+            explanation.setFont(Font.font(18.0));
+            explanation.setTextFill(Color.WHITE);
+            feedbackBox.getChildren().add(explanation);
+        }
+
+        Button nextButton = new Button("Następne Pytanie");
+        nextButton.setOnAction(e -> {
+            ++this.quizIndex;
+            this.showQuizQuestion();
+        });
+
+        feedbackBox.getChildren().addAll(status, nextButton);
+        this.window.setScene(new Scene(feedbackBox, 1000.0, 700.0));
+    }
+
+    private String getAnswerText(int index) {
+        Question q = this.questions.get(this.quizIndex);
+        return switch (index) {
+            case 1 -> "A: " + q.a;
+            case 2 -> "B: " + q.b;
+            case 3 -> "C: " + q.c;
+            case 4 -> "D: " + q.d;
+            default -> "Odpowiedź nie jest znana";
+        };
     }
 
     private void showQuizSummary() {
