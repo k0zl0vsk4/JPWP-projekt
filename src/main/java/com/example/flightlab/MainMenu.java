@@ -39,7 +39,7 @@ public class MainMenu extends Application {
 
         VBox menu = new VBox(20);
         menu.setAlignment(Pos.CENTER);
-        menu.setStyle("-fx-background-color: linear-gradient(to bottom, #4A90E2, #003B7A);");
+        menu.setStyle("-fx-background-image: url('/images/background.png'); " + "-fx-background-size: cover;");
 
         Label title = new Label("FlightLab - Nauka i symulator");
         title.setFont(Font.font(36));
