@@ -17,6 +17,7 @@ public class FlightLab_Main extends Application {
     private static final int HEIGHT = 700;
 
     private Plane plane;
+    private javafx.scene.image.Image planeImage;
     private boolean up, down, left, right, quickClimb;
 
     private double windX = 0.0;
@@ -25,12 +26,20 @@ public class FlightLab_Main extends Application {
     private long startTime;
     private boolean missionActive = false;
 
+    private double cameraX = 0;
+
     @Override
     public void start(Stage primaryStage) {
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
-        plane = new Plane(WIDTH * 0.1, HEIGHT * 0.6);
+        try {
+            planeImage = new javafx.scene.image.Image(getClass().getResourceAsStream("/images/plane_model.png"), 80, 40, true, true);
+        } catch (Exception e) {
+            System.out.println("Błąd: Nie udało się załadować grafiki samolotu!");
+        }
+
+        plane = new Plane(100, 400);
 
         StackPane root = new StackPane(canvas);
         Scene scene = new Scene(root);
@@ -100,8 +109,8 @@ public class FlightLab_Main extends Application {
     }
 
     private void update(double dt) {
-        if (up) plane.throttle = clamp(plane.throttle + 0.8 * dt, 0, 1);
-        if (down) plane.throttle = clamp(plane.throttle - 1.2 * dt, 0, 1);
+        if (up) plane.throttle = clamp(plane.throttle - 0.5 * dt, 0, 1);
+        if (down) plane.throttle = clamp(plane.throttle + 0.5 * dt, 0, 1);
 
         if (left) plane.turn(-60 * dt);
         if (right) plane.turn(60 * dt);
@@ -110,13 +119,22 @@ public class FlightLab_Main extends Application {
 
         plane.updatePhysics(dt, windX, windY);
 
-        if (plane.y > HEIGHT - 20) {
-            plane.y = HEIGHT - 20;
+        if (plane.y > HEIGHT - 50) {
+            plane.y = HEIGHT - 50;
             plane.vy = 0;
             plane.onGround = true;
         } else {
             plane.onGround = false;
         }
+
+        if (plane.y < 20) {
+            plane.y = 20;
+            if (plane.vy < 0) {
+                plane.vy = 0;
+            }
+        }
+
+        cameraX = Math.max(0, plane.x - 200); //moving background
 
         long elapsed = (System.currentTimeMillis() - startTime) / 1000;
         if (missionActive && elapsed % 10 == 0 && elapsed != 0) {
@@ -134,13 +152,28 @@ public class FlightLab_Main extends Application {
         g.setFill(Color.web("#4986c4")); //sky
         g.fillRect(0, 0, WIDTH, HEIGHT);
 
+        g.save();
+        g.translate(-cameraX, 0);
+
         g.setFill(Color.web("#266308")); // horizon
-        g.fillRect(0, HEIGHT - 80, WIDTH, 80);
+        g.fillRect(cameraX, HEIGHT - 80, WIDTH, 80);
 
         g.setFill(Color.DARKGRAY);
-        g.fillRect(150, HEIGHT -80, WIDTH, 80); //runway
+        g.fillRect(0, HEIGHT - 80, 1500, 80); //runway
+
+        int startMarker = (int)(cameraX / 500) * 500;
+        for (int i = startMarker; i < startMarker + WIDTH + 500; i += 500) {
+            if (i > 1500) {
+                g.setFill(Color.LIGHTGREEN);
+                g.fillRect(i, HEIGHT - 80, 20, 80);
+            } else {
+                g.setFill(Color.WHITE);
+                g.fillRect(i, HEIGHT - 45, 100, 10);
+            }
+        }
 
         drawPlane(g);
+        g.restore();
         drawHUD(g);
         drawMissionInfo(g);
     }
@@ -150,13 +183,16 @@ public class FlightLab_Main extends Application {
         g.translate(plane.x, plane.y);
         g.rotate(plane.angle);
 
-        g.setFill(Color.DARKSLATEGRAY);
-        g.fillRect(-30, -8, 60, 16); //body
-
-        g.setFill(Color.LIGHTGRAY);
-        g.fillPolygon(new double[]{-10, 40, 40, -10}, new double[]{-8, -22, 22, 8}, 4); //wings
-
-        g.fillRect(-35, -6, 6, 12); //tail
+        if (planeImage != null) {
+            double imgWidth = planeImage.getWidth();
+            double imgHeight = planeImage.getHeight();
+            g.drawImage(planeImage, -imgWidth / 2.0, -imgHeight / 2.0, imgWidth, imgHeight);
+        }
+        else
+        {
+            g.setFill(Color.RED);
+            g.fillRect(-30, -10, 60, 20);
+        }
         g.restore();
     }
 
@@ -247,7 +283,6 @@ public class FlightLab_Main extends Application {
             y += vy * dt;
 
             if (x < 0) {x = 0; vx = 0; }
-            if (x > WIDTH) {x =WIDTH; vx = 0; }
 
             pitch *= 0.96;
         }

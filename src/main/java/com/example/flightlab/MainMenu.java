@@ -106,6 +106,39 @@ public class MainMenu extends Application {
                 null,
                 "audio/overspeed.mp3"
         ));
+
+        questions.add(new Question(
+               "Jaki kolor ma światło nawigacyjne na lewym skrzydle samolotu?",
+                "Zielony",
+                "Czerwony",
+                "Biały",
+                "Żółty",
+                2,
+                null,
+                null
+        ));
+
+        questions.add(new Question(
+                "Jaki kod transpondera oznacza sytuację awaryjną?",
+                "7500",
+                "7600",
+                "7777",
+                "7700",
+                4,
+                null,
+                null
+        ));
+
+        questions.add(new Question(
+                "Co oznacza prędkość V1?",
+                "Prędkość oderwania od ziemi",
+                "Prędkość decyzji (startu nie można już przerwać)",
+                "Maksymalną prędkość przelotową",
+                "Prędkość lądowania",
+                2,
+                null,
+                null
+        ));
     }
 
     private void startQuiz() {
