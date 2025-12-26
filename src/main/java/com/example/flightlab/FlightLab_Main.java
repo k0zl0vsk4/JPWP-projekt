@@ -244,7 +244,7 @@ public class FlightLab_Main extends Application {
         double angle = 0; // degrees (0 = rightwards)
         double pitch = 0; // small pitch variable for lift influence
         double throttle = 0.2; // 0..1
-        double fuel = 100; // display width for simple bar (0..100)
+        double fuel = 100;
         boolean onGround = false;
 
         Plane(double x, double y) {

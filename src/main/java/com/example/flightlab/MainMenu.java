@@ -132,7 +132,7 @@ public class MainMenu extends Application {
         questions.add(new Question(
                 "Co oznacza prędkość V1?",
                 "Prędkość oderwania od ziemi",
-                "Prędkość decyzji (startu nie można już przerwać)",
+                "Prędkość decyzji (startu nie można przerwać)",
                 "Maksymalną prędkość przelotową",
                 "Prędkość lądowania",
                 2,
