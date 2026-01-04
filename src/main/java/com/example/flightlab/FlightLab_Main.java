@@ -143,7 +143,12 @@ public class FlightLab_Main extends Application {
             plane.y = HEIGHT - 50;
             plane.vy = 0;
             plane.onGround = true;
-        } else {
+
+            if (plane.throttle < 0.1) {
+                plane.vx *= 0.95; //wheel friction on the ground
+            }
+        }
+        else {
             plane.onGround = false;
         }
 
@@ -155,17 +160,22 @@ public class FlightLab_Main extends Application {
         }
 
         if (plane.x > DESTINATION_X && plane.x < DESTINATION_X + RUNWAY_LENGTH) {
-            if (plane.onGround && plane.getSpeed() < 5.0) {
-                if (!gameWon) {
-                    gameWon = true;
-                    missionActive = false;
+            if (plane.onGround) {
+                if (plane.getSpeed() < 5.0) {
+                    if (!gameWon) {
+                        gameWon = true;
+                        missionActive = false;
 
-                    Player current = GameData.getInstance().getCurrentPlayer();
-                    if (current != null) {
-                        current.addMissionPoints(50);
-                        GameData.getInstance().saveData();
-                        System.out.println("Przyznano punkty dla: " + current.getName());
+                        Player current = GameData.getInstance().getCurrentPlayer();
+                        if (current != null) {
+                            current.addMissionPoints(50);
+                            GameData.getInstance().saveData();
+                            System.out.println("Punkty przyznane dla " + current.getName());
+                        }
                     }
+                }
+                else {
+                    System.out.println("Na pasie, ale za szybko! Prędkość: " + plane.getSpeed());
                 }
             }
         }
@@ -194,24 +204,24 @@ public class FlightLab_Main extends Application {
         g.setFill(Color.web("#266308")); // horizon
         g.fillRect(cameraX, HEIGHT - 80, WIDTH, 80);
 
-        g.setFill(Color.DARKGRAY);
-        g.fillRect(0, HEIGHT - 80, 1500, 80); //runway
-
-        int startMarker = (int) (cameraX / 500) * 500;
+        int startMarker = (int)(cameraX / 500) * 500;
         for (int i = startMarker; i < startMarker + WIDTH + 500; i += 500) {
-            if (i > 1500) {
+            boolean onStart = (i >= 0 && i < RUNWAY_LENGTH);
+            boolean onEnd = (i >= DESTINATION_X && i < DESTINATION_X + RUNWAY_LENGTH);
+
+            if (!onStart && !onEnd) {
                 g.setFill(Color.LIGHTGREEN);
                 g.fillRect(i, HEIGHT - 80, 20, 80);
-            } else {
-                g.setFill(Color.WHITE);
-                g.fillRect(i, HEIGHT - 45, 100, 10);
             }
         }
 
+        drawRunway(g, 0);
+        drawRunway(g, DESTINATION_X);
+
         g.setFill(Color.RED);
-        g.fillRect(DESTINATION_X, HEIGHT - 150, 10, 70);
-        g.fillPolygon(new double[]{DESTINATION_X, DESTINATION_X + 50, DESTINATION_X},
-                new double[]{HEIGHT - 150, HEIGHT - 135, HEIGHT - 120}, 3);
+        g.fillRect(DESTINATION_X, HEIGHT - 150, 10, 70); // Słupek
+        g.fillPolygon(new double[]{DESTINATION_X, DESTINATION_X+50, DESTINATION_X},
+                new double[]{HEIGHT-150, HEIGHT-135, HEIGHT-120}, 3);
 
         drawPlane(g);
         g.restore();
@@ -281,7 +291,7 @@ public class FlightLab_Main extends Application {
             g.fillText(missionActive ? "Mission: ACTIVE (Press ENTER to toggle)" : "Mission: INACTIVE (Press ENTER to start)", 300, 30);
 
             g.setFont(Font.font(12));
-            g.fillText("Controls: W/S throttle, A/D turn, SPACE climb", 300, 50);
+            g.fillText("Controls: W/S pitch (Up/Down), A/D throttle, SPACE climb", 300, 50);
             g.fillText("Goal: Take off, follow heading, land on runway", 300, 68);
 
             if (plane.fuel < 20) {
