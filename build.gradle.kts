@@ -44,7 +44,6 @@ dependencies {
     implementation("org.kordamp.bootstrapfx:bootstrapfx-core:0.4.0")
     implementation("com.github.almasb:fxgl:17.3") {
         exclude(group = "org.openjfx")
-        exclude(group = "org.jetbrains.kotlin")
     }
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
