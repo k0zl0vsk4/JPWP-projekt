@@ -1,8 +1,12 @@
 package com.example.flightlab;
 
+import com.example.flightlab.GameData;
+import com.example.flightlab.Player;
+import com.example.flightlab.Question;
+import com.example.flightlab.QuestionDataBase;
+
 import javafx.application.Application;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -16,6 +20,7 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class MainMenu extends Application {
@@ -24,8 +29,10 @@ public class MainMenu extends Application {
     private Scene loginScene, menuScene, quizScene, scoresScene;
 
     private int quizIndex = 0;
-    private int sessionScore = 0; //Points earned in this quiz session
-    private List<Question> questions = new ArrayList<>();
+    private int sessionScore = 0;
+
+    // Lista pytań aktywnych w tej sesji
+    private List<Question> activeQuestions = new ArrayList<>();
 
     @Override
     public void start(Stage primaryStage) {
@@ -35,7 +42,6 @@ public class MainMenu extends Application {
         createLoginScene();
         createMenuScene();
         createScoresScene();
-        buildQuestions();
 
         window.setScene(loginScene);
         window.show();
@@ -60,7 +66,6 @@ public class MainMenu extends Application {
         loginButton.setOnAction(e -> {
             String name = nameInput.getText();
             if (!name.trim().isEmpty()) {
-
                 GameData.getInstance().login(name);
                 updateTitle();
                 window.setScene(menuScene);
@@ -74,16 +79,18 @@ public class MainMenu extends Application {
     private void createMenuScene() {
         VBox menu = new VBox(20);
         menu.setAlignment(Pos.CENTER);
-        menu.setStyle("-fx-background-image: url('/images/background.png'); -fx-background-size: cover;");
-        // Jeśli nie masz tła, użyj gradientu:
-        // menu.setStyle("-fx-background-color: linear-gradient(to bottom, #4A90E2, #003B7A);");
+        try {
+            menu.setStyle("-fx-background-image: url('/images/background.png'); -fx-background-size: cover;");
+        } catch (Exception e) {
+            menu.setStyle("-fx-background-color: linear-gradient(to bottom, #4A90E2, #003B7A);");
+        }
 
         Label title = new Label("FlightLab - Hangar");
         title.setFont(Font.font(36));
         title.setTextFill(Color.WHITE);
 
         Button simButton = new Button("Start Symulatora");
-        Button quizButton = new Button("Panel Edukacyjny (Quiz ABCD)");
+        Button quizButton = new Button("Panel Edukacyjny (Quiz)");
         Button scoresButton = new Button("Tabela Wyników");
         Button changeUserButton = new Button("Wyloguj / Zmień Gracza");
         Button exitButton = new Button("Wyjście");
@@ -96,7 +103,7 @@ public class MainMenu extends Application {
 
         simButton.setOnAction(e -> startSimulation());
         quizButton.setOnAction(e -> startQuiz());
-        scoresButton.setOnAction(e -> { window.setScene(scoresScene); });
+        scoresButton.setOnAction(e -> window.setScene(scoresScene));
         changeUserButton.setOnAction(e -> window.setScene(loginScene));
         exitButton.setOnAction(e -> window.close());
 
@@ -145,22 +152,41 @@ public class MainMenu extends Application {
     private void startQuiz() {
         quizIndex = 0;
         sessionScore = 0;
+        activeQuestions.clear();
+
+        //Taking 10 random questions from database for quiz:
+        List<Question> allQuestions = QuestionDataBase.getQuestions();
+
+        Collections.shuffle(allQuestions);
+
+        int numberOfQuestions = Math.min(allQuestions.size(), 10);
+        for (int i = 0; i < numberOfQuestions; i++) {
+            activeQuestions.add(allQuestions.get(i));
+        }
+
         showQuizQuestion();
     }
 
     private void showQuizQuestion() {
-        if (this.quizIndex >= this.questions.size()) {
+        if (this.quizIndex >= this.activeQuestions.size()) {
             this.showQuizSummary();
         } else {
-            Question q = this.questions.get(this.quizIndex);
+            Question q = this.activeQuestions.get(this.quizIndex);
+
             VBox box = new VBox(20.0);
             box.setAlignment(Pos.CENTER);
             box.setStyle("-fx-background-color: #202020;");
 
+            Label counter = new Label("Pytanie " + (quizIndex + 1) + " z " + activeQuestions.size());
+            counter.setTextFill(Color.GRAY);
+            counter.setFont(Font.font(16));
+
             Label qText = new Label(q.text);
             qText.setFont(Font.font(22.0));
             qText.setTextFill(Color.WHITE);
-            box.getChildren().add(qText);
+            qText.setWrapText(true);
+
+            box.getChildren().addAll(counter, qText);
 
             if (q.imageUrl != null) {
                 try {
@@ -193,6 +219,11 @@ public class MainMenu extends Application {
             Button c = new Button("C: " + q.c);
             Button d = new Button("D: " + q.d);
 
+            a.setPrefWidth(400);
+            b.setPrefWidth(400);
+            c.setPrefWidth(400);
+            d.setPrefWidth(400);
+
             a.setOnAction(e -> checkAnswer(1));
             b.setOnAction(e -> checkAnswer(2));
             c.setOnAction(e -> checkAnswer(3));
@@ -201,7 +232,7 @@ public class MainMenu extends Application {
             VBox answers = new VBox(10.0, a, b, c, d);
             answers.setAlignment(Pos.CENTER);
 
-            Button back = new Button("Powrót do menu");
+            Button back = new Button("Przerwij i wróć do menu");
             back.setOnAction(e -> window.setScene(menuScene));
             back.setPrefWidth(200.0);
 
@@ -212,12 +243,11 @@ public class MainMenu extends Application {
     }
 
     private void checkAnswer(int chosen) {
-        Question currentQ = this.questions.get(this.quizIndex);
+        Question currentQ = this.activeQuestions.get(this.quizIndex);
         boolean isCorrect = (chosen == currentQ.correct);
 
         if (isCorrect) {
             sessionScore++;
-
             Player current = GameData.getInstance().getCurrentPlayer();
             if (current != null) {
                 current.addQuizPoint();
@@ -254,7 +284,7 @@ public class MainMenu extends Application {
     }
 
     private String getAnswerText(int index) {
-        Question q = this.questions.get(this.quizIndex);
+        Question q = this.activeQuestions.get(this.quizIndex);
         return switch (index) {
             case 1 -> "A: " + q.a;
             case 2 -> "B: " + q.b;
@@ -269,12 +299,13 @@ public class MainMenu extends Application {
         box.setAlignment(Pos.CENTER);
         box.setStyle("-fx-background-color: #1B1B1B;");
 
-        Label result = new Label("Wynik tej sesji: " + sessionScore + " / " + questions.size());
+        Label result = new Label("Koniec Quizu!\nTwój wynik w tej sesji: " + sessionScore + " / " + activeQuestions.size());
         result.setFont(Font.font(26));
         result.setTextFill(Color.WHITE);
+        result.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
 
         Player p = GameData.getInstance().getCurrentPlayer();
-        Label totalInfo = new Label("Całkowite punkty quizowe gracza " + p.getName() + ": " + p.getQuizPoints());
+        Label totalInfo = new Label("Łączne punkty quizowe gracza " + p.getName() + ": " + p.getQuizPoints());
         totalInfo.setTextFill(Color.LIGHTGRAY);
         totalInfo.setFont(Font.font(18));
 
@@ -283,16 +314,6 @@ public class MainMenu extends Application {
 
         box.getChildren().addAll(result, totalInfo, back);
         window.setScene(new Scene(box, 1000, 700));
-    }
-
-    private void buildQuestions() {
-        questions.clear();
-        questions.add(new Question("Co powoduje wzrost siły nośnej skrzydeł?", "Zwiększenie prędkości lotu", "Zmniejszenie kąta natarcia", "Zwiększenie masy samolotu", "Wyłączenie silnika", 1, null, null));
-        questions.add(new Question("Jaką część samolotu pokazano na ilustracji?", "Lotki", "Klapy", "Ster wysokości", "Podwozie", 2, "images/flaps.jpg", null));
-        questions.add(new Question("Co oznacza usłyszany komunikat?", "Gwałtowne przeciągnięcie", "Dużą prędkość", "Silny boczny wiatr", "Awarię silnika", 2, null, "audio/overspeed.mp3"));
-        questions.add(new Question("Jaki kolor ma światło nawigacyjne na lewym skrzydle samolotu?", "Zielony", "Czerwony", "Biały", "Żółty", 2, null, null));
-        questions.add(new Question("Jaki kod transpondera oznacza sytuację awaryjną?", "7500", "7600", "7777", "7700", 4, null, null));
-        questions.add(new Question("Co oznacza prędkość V1?", "Prędkość oderwania od ziemi", "Prędkość decyzji (startu nie można przerwać)", "Maksymalną prędkość przelotową", "Prędkość lądowania", 2, null, null));
     }
 
     private void startSimulation() {
@@ -305,24 +326,6 @@ public class MainMenu extends Application {
         Player p = GameData.getInstance().getCurrentPlayer();
         if (p != null) {
             window.setTitle("FlightLab - Pilot: " + p.getName());
-        }
-    }
-
-    public static class Question {
-        String text, a, b, c, d;
-        int correct;
-        String imageUrl;
-        String audioUrl;
-
-        public Question(String text, String a, String b, String c, String d, int correct, String imageUrl, String audioUrl) {
-            this.text = text;
-            this.a = a;
-            this.b = b;
-            this.c = c;
-            this.d = d;
-            this.correct = correct;
-            this.imageUrl = imageUrl;
-            this.audioUrl = audioUrl;
         }
     }
 
