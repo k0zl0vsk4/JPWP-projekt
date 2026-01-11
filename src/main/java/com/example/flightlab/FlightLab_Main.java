@@ -13,6 +13,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
 public class FlightLab_Main extends Application {
@@ -51,7 +52,7 @@ public class FlightLab_Main extends Application {
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
         try {
-            planeImage = new javafx.scene.image.Image(getClass().getResourceAsStream("/images/plane_model.png"), 80, 40, true, true);
+            planeImage = new javafx.scene.image.Image(getClass().getClassLoader().getResourceAsStream("images/plane_model.png"), 80, 40, true, true);
         } catch (Exception e) {
             System.out.println("Info: Brak pliku plane_model.png.");
         }
@@ -61,6 +62,7 @@ public class FlightLab_Main extends Application {
 
         if (missionLogic.getType() == MissionType.EMERGENCY) {
             missionActive = true;
+            plane.throttle = 0.4;
         }
 
         StackPane root = new StackPane(canvas);
@@ -77,7 +79,6 @@ public class FlightLab_Main extends Application {
 
         AnimationTimer loop = new AnimationTimer() {
             private long last = 0;
-
             @Override
             public void handle(long now) {
                 if (last == 0) last = now;
@@ -98,11 +99,11 @@ public class FlightLab_Main extends Application {
         if (down) plane.turn(60 * dt);
         if (left) plane.throttle = clamp(plane.throttle - 0.5 * dt, 0, 1);
 
-        //For emergency mission throttle is blocked (engine failure)
-        if (right) {
-            if (missionLogic.getType() != MissionType.EMERGENCY) {
-                plane.throttle = clamp(plane.throttle + 0.5 * dt, 0, 1);
-            }
+        //For emergency mission throttle is blocked (limit 40%)
+        if (right)
+        {
+            double maxThrottle = (missionLogic.getType() == MissionType.EMERGENCY) ? 0.4 : 1.0;
+            plane.throttle = clamp(plane.throttle + 0.5 * dt, 0, maxThrottle);
         }
         if (quickClimb) plane.pitch += 20 * dt;
 
@@ -124,9 +125,25 @@ public class FlightLab_Main extends Application {
             if (plane.vy < 0) plane.vy = 0;
         }
 
-        int points = missionLogic.checkVictory(plane);
-        if (points > 0) {
-            handleVictory(points);
+        if (plane.onGround && plane.getSpeed() < 5.0) {
+            if (missionLogic.getType() == MissionType.PRECISION) {
+                if (plane.x < 5200 || plane.x > 5300) {
+                    handleGameOver("PUDŁO! Lądowanie poza strefą.");
+                    return;
+                }
+            }
+
+            int points = missionLogic.checkVictory(plane);
+            if (points > 0) {
+                handleVictory(points);
+            }
+            else if (plane.x > missionLogic.getDestX() + missionLogic.getRunwayLen()) {
+                handleGameOver("KRAKSA! Wyjazd poza pas startowy.");
+            }
+        }
+
+        if (missionLogic.getType() == MissionType.LOW_PASS && plane.onGround && plane.x > missionLogic.getDestX()) {
+            handleGameOver("BŁĄD! Miałeś nie lądować!");
         }
 
         cameraX = Math.max(0, plane.x - 200);
@@ -138,24 +155,29 @@ public class FlightLab_Main extends Application {
             windX *= 0.95;
         }
 
-        plane.fuel = Math.max(0, plane.fuel - 0.01 * plane.throttle * dt);
+        if (missionLogic.getType() != MissionType.EMERGENCY) {
+            plane.fuel = Math.max(0, plane.fuel - 0.05 * plane.throttle * dt);
+        }
+
         if (plane.fuel <= 0)
             plane.throttle = Math.max(0, plane.throttle - 0.5 * dt);
     }
 
     private void handleVictory(int points) {
-        gameWon = true;
-        missionActive = false;
+        if (!gameWon && !gameLost) {
+            gameWon = true;
+            missionActive = false;
 
-        if (plane.flapsExtended && missionLogic.getType() != MissionType.LOW_PASS) {
-            points += 20;
-        }
+            if (plane.flapsExtended && missionLogic.getType() != MissionType.LOW_PASS) {
+                points += 20;
+            }
 
-        Player current = GameData.getInstance().getCurrentPlayer();
-        if (current != null) {
-            current.addMissionPoints(points);
-            GameData.getInstance().saveData();
-            System.out.println("Zadanie wykonane! +" + points + " pkt");
+            Player current = GameData.getInstance().getCurrentPlayer();
+            if (current != null) {
+                current.addMissionPoints(points);
+                GameData.getInstance().saveData();
+                System.out.println("Zadanie wykonane! +" + points + " pkt");
+            }
         }
     }
 
@@ -177,26 +199,19 @@ public class FlightLab_Main extends Application {
             case SPACE -> quickClimb = true;
             case F -> plane.toggleFlaps();
             case ENTER -> {
-                if (gameWon) {
-                    try {
-                        new MainMenu().start((Stage) ((Scene) e.getSource()).getWindow());
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
+                if (gameWon || gameLost) {
+                    try { new MainMenu().start((Stage)((Scene)e.getSource()).getWindow()); }
+                    catch (Exception ex) { ex.printStackTrace(); }
                 } else {
                     missionActive = !missionActive;
                     if (missionActive) startTime = System.currentTimeMillis();
                 }
             }
             case ESCAPE -> {
-                try {
-                    new MainMenu().start((Stage) ((Scene) e.getSource()).getWindow());
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
+                try { new MainMenu().start((Stage)((Scene)e.getSource()).getWindow()); }
+                catch (Exception ex) { ex.printStackTrace(); }
             }
-            default -> {
-            }
+            default -> {}
         }
     }
 
@@ -208,8 +223,7 @@ public class FlightLab_Main extends Application {
             case A -> left = false;
             case D -> right = false;
             case SPACE -> quickClimb = false;
-            default -> {
-            }
+            default -> {}
         }
     }
 
@@ -224,7 +238,7 @@ public class FlightLab_Main extends Application {
         g.fillRect(cameraX, HEIGHT - 80, WIDTH, 80);
 
         //Grass
-        int startMarker = (int) (cameraX / 500) * 500;
+        int startMarker = (int)(cameraX / 500) * 500;
         for (int i = startMarker; i < startMarker + WIDTH + 500; i += 500) {
             boolean onStart = (i >= 0 && i < missionLogic.getRunwayLen());
             boolean onEnd = (i >= missionLogic.getDestX() && i < missionLogic.getDestX() + missionLogic.getRunwayLen());
@@ -248,8 +262,8 @@ public class FlightLab_Main extends Application {
 
         g.setFill(Color.RED);
         g.fillRect(missionLogic.getDestX(), HEIGHT - 150, 10, 70);
-        g.fillPolygon(new double[]{missionLogic.getDestX(), missionLogic.getDestX() + 50, missionLogic.getDestX()},
-                new double[]{HEIGHT - 150, HEIGHT - 135, HEIGHT - 120}, 3);
+        g.fillPolygon(new double[]{missionLogic.getDestX(), missionLogic.getDestX()+50, missionLogic.getDestX()},
+                new double[]{HEIGHT-150, HEIGHT-135, HEIGHT-120}, 3);
 
         drawPlane(g);
         g.restore();
@@ -266,6 +280,21 @@ public class FlightLab_Main extends Application {
             g.setFill(Color.WHITE);
             g.setFont(Font.font("Arial", 24));
             g.fillText("Punkty zapisane. ENTER = Powrót", 320, 350);
+        }
+
+        if (gameLost) {
+            g.setFill(Color.rgb(50, 0, 0, 0.8));
+            g.fillRect(0, 0, WIDTH, HEIGHT);
+            g.setFill(Color.RED);
+            g.setFont(Font.font("Arial", FontWeight.BOLD, 48));
+            g.fillText("MISJA NIEUDANA!", WIDTH/2 - 200, 250);
+
+            g.setFill(Color.WHITE);
+            g.setFont(Font.font("Arial", 28));
+            g.fillText(endMessage, WIDTH/2 - 200, 320);
+
+            g.setFont(Font.font("Arial", 20));
+            g.fillText("Naciśnij ENTER, aby spróbować ponownie.", WIDTH/2 - 200, 400);
         }
     }
 
@@ -319,14 +348,17 @@ public class FlightLab_Main extends Application {
         g.fillText("Fuel", 150, 56);
         g.setStroke(Color.GRAY);
         g.strokeRect(150, 62, 100, 14);
-        g.setFill(Color.LIMEGREEN);
+
+        if (plane.fuel < 20) g.setFill(Color.RED);
+        else g.setFill(Color.LIMEGREEN);
+
         g.fillRect(150, 62, plane.fuel, 14);
     }
 
     private void drawMissionInfo(GraphicsContext g) {
-        if (gameWon) return;
+        if (gameWon || gameLost) return;
 
-        g.setFill(Color.rgb(255, 255, 255, 0.9));
+        g.setFill(Color.rgb(255,255,255,0.9));
         g.setFont(Font.font(16));
         g.fillText("Misja: " + missionLogic.getObjectiveText(), 300, 30);
 
@@ -366,9 +398,7 @@ public class FlightLab_Main extends Application {
             flapsExtended = !flapsExtended;
         }
 
-        double getSpeed() {
-            return Math.hypot(vx, vy);
-        }
+        double getSpeed() { return Math.hypot(vx, vy); }
 
         void updatePhysics(double dt, double windX, double windY, MissionType mission) {
             double rad = Math.toRadians(angle);
@@ -394,11 +424,12 @@ public class FlightLab_Main extends Application {
             x += vx * dt;
             y += vy * dt;
 
-            if (x < 0) {
-                x = 0;
-                vx = 0;
-            }
+            if (x < 0) { x = 0; vx = 0; }
             pitch *= 0.96;
         }
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }

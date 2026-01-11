@@ -14,8 +14,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
@@ -27,7 +25,6 @@ import java.util.List;
 public class MainMenu extends Application {
 
     private Stage window;
-
     private Scene loginScene, menuScene, quizScene, scoresScene, missionSelectScene;
 
     private int quizIndex = 0;
@@ -48,6 +45,22 @@ public class MainMenu extends Application {
         window.show();
     }
 
+    private void styleButton(Button btn) {
+        btn.setStyle("-fx-background-color: #0056bf; -fx-text-fill: white; -fx-font-size: 14px; -fx-background-radius: 5;");
+
+        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: #0069d9; -fx-text-fill: white; -fx-font-size: 14px; -fx-background-radius: 5;"));
+        btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: #0056bf; -fx-text-fill: white; -fx-font-size: 14px; -fx-background-radius: 5;"));
+
+        btn.setOnMousePressed(e -> {
+            btn.setScaleX(0.95);
+            btn.setScaleY(0.95);
+        });
+        btn.setOnMouseReleased(e -> {
+            btn.setScaleX(1.0);
+            btn.setScaleY(1.0);
+        });
+    }
+
     private void createLoginScene() {
         VBox layout = new VBox(20);
         layout.setAlignment(Pos.CENTER);
@@ -59,10 +72,11 @@ public class MainMenu extends Application {
 
         TextField nameInput = new TextField();
         nameInput.setMaxWidth(300);
-        nameInput.setPromptText("Wpisz imię/nazwę...");
+        nameInput.setPromptText("Wpisz imię...");
 
         Button loginButton = new Button("ZALOGUJ / STWÓRZ");
         loginButton.setPrefWidth(200);
+        styleButton(loginButton);
 
         loginButton.setOnAction(e -> {
             String name = nameInput.getText();
@@ -102,8 +116,13 @@ public class MainMenu extends Application {
         changeUserButton.setPrefWidth(300);
         exitButton.setPrefWidth(300);
 
-        simButton.setOnAction(e -> window.setScene(missionSelectScene));
+        styleButton(simButton);
+        styleButton(quizButton);
+        styleButton(scoresButton);
+        styleButton(changeUserButton);
+        styleButton(exitButton);
 
+        simButton.setOnAction(e -> window.setScene(missionSelectScene));
         quizButton.setOnAction(e -> startQuiz());
         scoresButton.setOnAction(e -> window.setScene(scoresScene));
         changeUserButton.setOnAction(e -> window.setScene(loginScene));
@@ -123,13 +142,19 @@ public class MainMenu extends Application {
         label.setFont(Font.font(30));
 
         Button btn1 = new Button("1. Lot Swobodny / Trening");
-        Button btn2 = new Button("2. Precyzja (Żółta strefa)");
+        Button btn2 = new Button("2. Precyzja (Żółta strefa 100m)");
         Button btn3 = new Button("3. Awaria Silnika (Start w powietrzu)");
         Button btn4 = new Button("4. Low Pass (Przelot niski)");
         Button backBtn = new Button("Powrót do Menu");
 
         btn1.setPrefWidth(400); btn2.setPrefWidth(400);
         btn3.setPrefWidth(400); btn4.setPrefWidth(400); backBtn.setPrefWidth(200);
+
+        styleButton(btn1);
+        styleButton(btn2);
+        styleButton(btn3);
+        styleButton(btn4);
+        styleButton(backBtn);
 
         btn1.setOnAction(e -> new FlightLab_Main(MissionType.NORMAL).start(window));
         btn2.setOnAction(e -> new FlightLab_Main(MissionType.PRECISION).start(window));
@@ -145,35 +170,58 @@ public class MainMenu extends Application {
     private void createScoresScene() {
         VBox layout = new VBox(20);
         layout.setAlignment(Pos.CENTER);
-        layout.setStyle("-fx-background-color: #202020;");
 
-        Label label = new Label("RANKING PODNIEBNYCH ADEPTÓW");
+        try {
+            layout.setStyle("-fx-background-image: url('/images/background.png'); -fx-background-size: cover;");
+        } catch (Exception e) {
+            layout.setStyle("-fx-background-color: #1a1a1a;");
+        }
+
+        Label label = new Label("RANKING ASÓW PRZESTWORZY");
         label.setTextFill(Color.GOLD);
-        label.setFont(Font.font(30));
+        label.setFont(Font.font("Arial", 28));
+        label.setStyle("-fx-background-color: rgba(0,0,0,0.5); -fx-padding: 10; -fx-background-radius: 10;");
 
         TableView<Player> table = new TableView<>();
         table.setItems(GameData.getInstance().getPlayers());
-        table.setMaxWidth(600);
+        table.setMaxWidth(700);
 
-        TableColumn<Player, String> nameCol = new TableColumn<>("Pilot");
+        table.setStyle(
+                "-fx-background-color: rgba(43, 43, 43, 0.8);" +
+                        "-fx-control-inner-background: rgba(43, 43, 43, 0.8);" +
+                        "-fx-control-inner-background-alt: rgba(53, 53, 53, 0.8);" +
+                        "-fx-text-fill: white;" +
+                        "-fx-table-cell-border-color: transparent;" +
+                        "-fx-font-size: 14px;"
+        );
+
+        TableColumn<Player, String> nameCol = new TableColumn<>("PILOT");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
-        nameCol.setMinWidth(200);
+        nameCol.setMinWidth(250);
+        nameCol.setStyle("-fx-alignment: CENTER-LEFT; -fx-text-fill: #4db8ff;");
 
-        TableColumn<Player, Integer> quizCol = new TableColumn<>("Punkty Quiz");
+        TableColumn<Player, Integer> quizCol = new TableColumn<>("QUIZ");
         quizCol.setCellValueFactory(new PropertyValueFactory<>("quizPoints"));
-        quizCol.setMinWidth(150);
+        quizCol.setMinWidth(130);
+        quizCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: white;");
 
-        TableColumn<Player, Integer> missionCol = new TableColumn<>("Punkty Misji");
+        TableColumn<Player, Integer> missionCol = new TableColumn<>("MISJE");
         missionCol.setCellValueFactory(new PropertyValueFactory<>("missionPoints"));
-        missionCol.setMinWidth(150);
+        missionCol.setMinWidth(130);
+        missionCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: white;");
 
-        TableColumn<Player, Integer> totalCol = new TableColumn<>("SUMA");
+        TableColumn<Player, Integer> totalCol = new TableColumn<>("TOTAL");
         totalCol.setCellValueFactory(new PropertyValueFactory<>("totalScore"));
-        totalCol.setMinWidth(100);
+        totalCol.setMinWidth(120);
+        totalCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: gold; -fx-font-weight: bold;");
 
         table.getColumns().addAll(nameCol, quizCol, missionCol, totalCol);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         Button backButton = new Button("Powrót do Menu");
+        backButton.setPrefWidth(200);
+        styleButton(backButton);
+
         backButton.setOnAction(e -> window.setScene(menuScene));
 
         layout.getChildren().addAll(label, table, backButton);
@@ -189,8 +237,7 @@ public class MainMenu extends Application {
         Collections.shuffle(allQuestions);
 
         int numberOfQuestions = Math.min(allQuestions.size(), 10);
-        for (int i = 0; i < numberOfQuestions; i++)
-        {
+        for (int i = 0; i < numberOfQuestions; i++) {
             activeQuestions.add(allQuestions.get(i));
         }
 
@@ -200,23 +247,29 @@ public class MainMenu extends Application {
     private void showQuizQuestion() {
         if (this.quizIndex >= this.activeQuestions.size()) {
             this.showQuizSummary();
-        }
-        else
-        {
+        } else {
             Question q = this.activeQuestions.get(this.quizIndex);
 
             VBox box = new VBox(20.0);
             box.setAlignment(Pos.CENTER);
-            box.setStyle("-fx-background-color: #202020;");
+
+            try {
+                box.setStyle("-fx-background-image: url('/images/quiz_bg.png'); -fx-background-size: cover;");
+            } catch (Exception e) {
+                box.setStyle("-fx-background-color:#73808c;");
+            }
 
             Label counter = new Label("Pytanie " + (quizIndex + 1) + " z " + activeQuestions.size());
-            counter.setTextFill(Color.GRAY);
+            counter.setTextFill(Color.LIGHTGRAY);
             counter.setFont(Font.font(16));
+
+            counter.setStyle("-fx-background-color: rgba(0,0,0,0.5); -fx-padding: 5;");
 
             Label qText = new Label(q.text);
             qText.setFont(Font.font(22.0));
             qText.setTextFill(Color.WHITE);
             qText.setWrapText(true);
+            qText.setStyle("-fx-background-color: rgba(0,0,0,0.5); -fx-padding: 10; -fx-background-radius: 5;");
 
             box.getChildren().addAll(counter, qText);
 
@@ -232,26 +285,13 @@ public class MainMenu extends Application {
                 }
             }
 
-            if (q.audioUrl != null) {
-                Button playAudio = new Button("Odtwórz nagranie");
-                playAudio.setOnAction(e -> {
-                    try {
-                        String fullPath = "/" + q.audioUrl;
-                        Media audio = new Media(this.getClass().getResource(fullPath).toString());
-                        new MediaPlayer(audio).play();
-                    } catch (Exception ex) {
-                        System.out.println("Błąd audio.");
-                    }
-                });
-                box.getChildren().add(playAudio);
-            }
-
             Button a = new Button("A: " + q.a);
             Button b = new Button("B: " + q.b);
             Button c = new Button("C: " + q.c);
             Button d = new Button("D: " + q.d);
 
             a.setPrefWidth(400); b.setPrefWidth(400); c.setPrefWidth(400); d.setPrefWidth(400);
+            styleButton(a); styleButton(b); styleButton(c); styleButton(d);
 
             a.setOnAction(e -> checkAnswer(1));
             b.setOnAction(e -> checkAnswer(2));
@@ -264,6 +304,7 @@ public class MainMenu extends Application {
             Button back = new Button("Przerwij i wróć do menu");
             back.setOnAction(e -> window.setScene(menuScene));
             back.setPrefWidth(200.0);
+            styleButton(back);
 
             box.getChildren().addAll(answers, back);
             quizScene = new Scene(box, 1000.0, 700.0);
@@ -271,8 +312,7 @@ public class MainMenu extends Application {
         }
     }
 
-    private void checkAnswer(int chosen)
-    {
+    private void checkAnswer(int chosen) {
         Question currentQ = this.activeQuestions.get(this.quizIndex);
         boolean isCorrect = (chosen == currentQ.correct);
 
@@ -287,20 +327,27 @@ public class MainMenu extends Application {
         showFeedback(isCorrect, currentQ);
     }
 
-    private void showFeedback(boolean correct, Question q)
-    {
+    private void showFeedback(boolean correct, Question q) {
         VBox feedbackBox = new VBox(20.0);
         feedbackBox.setAlignment(Pos.CENTER);
-        feedbackBox.setStyle(correct ? "-fx-background-color: #27A65B;" : "-fx-background-color: #C0392B;");
+
+        try {
+            String bgImage = correct ? "/images/correct.png" : "/images/wrong.png";
+            feedbackBox.setStyle("-fx-background-image: url('" + bgImage + "'); -fx-background-size: cover;");
+        } catch (Exception e) {
+            feedbackBox.setStyle(correct ? "-fx-background-color: #27A65B;" : "-fx-background-color: #C0392B;");
+        }
 
         Label status = new Label(correct ? "DOBRZE!" : "ŹLE!");
-        status.setFont(Font.font(36.0));
-        status.setTextFill(Color.WHITE);
+        status.setFont(Font.font(48.0));
+        status.setTextFill(correct ? Color.LIME : Color.RED);
+        status.setStyle("-fx-effect: dropshadow(three-pass-box, black, 10, 0, 0, 0);");
 
         if (!correct) {
             Label explanation = new Label("Poprawna odpowiedź: " + getAnswerText(q.correct) + ".");
-            explanation.setFont(Font.font(18.0));
+            explanation.setFont(Font.font(20.0));
             explanation.setTextFill(Color.WHITE);
+            explanation.setStyle("-fx-effect: dropshadow(three-pass-box, black, 5, 0, 0, 0);");
             feedbackBox.getChildren().add(explanation);
         }
 
@@ -309,6 +356,7 @@ public class MainMenu extends Application {
             quizIndex++;
             showQuizQuestion();
         });
+        styleButton(nextButton);
 
         feedbackBox.getChildren().addAll(status, nextButton);
         window.setScene(new Scene(feedbackBox, 1000.0, 700.0));
@@ -342,6 +390,7 @@ public class MainMenu extends Application {
 
         Button back = new Button("Powrót do menu");
         back.setOnAction(e -> window.setScene(menuScene));
+        styleButton(back);
 
         box.getChildren().addAll(result, totalInfo, back);
         window.setScene(new Scene(box, 1000, 700));
