@@ -16,13 +16,13 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 public class FlightLab_Main extends Application {
+
     private static final int WIDTH = 1000;
     private static final int HEIGHT = 700;
 
-    private static final double DESTINATION_X = 5000.0; //goal to fly: 5k meters
-    private static final double RUNWAY_LENGTH = 1500.0; //length in meters
-
+    private MissionLogic missionLogic;
     private Plane plane;
+
     private javafx.scene.image.Image planeImage;
     private boolean up, down, left, right, quickClimb;
 
@@ -32,8 +32,18 @@ public class FlightLab_Main extends Application {
     private long startTime;
     private boolean missionActive = false;
     private boolean gameWon = false;
+    private boolean gameLost = false;
+    private String endMessage = ""; //Final message
 
     private double cameraX = 0;
+
+    public FlightLab_Main() {
+        this.missionLogic = new MissionLogic(MissionType.NORMAL);
+    }
+
+    public FlightLab_Main(MissionType missionType) {
+        this.missionLogic = new MissionLogic(missionType);
+    }
 
     @Override
     public void start(Stage primaryStage) {
@@ -43,10 +53,15 @@ public class FlightLab_Main extends Application {
         try {
             planeImage = new javafx.scene.image.Image(getClass().getResourceAsStream("/images/plane_model.png"), 80, 40, true, true);
         } catch (Exception e) {
-            System.out.println("Błąd: Nie udało się załadować grafiki samolotu!");
+            System.out.println("Info: Brak pliku plane_model.png.");
         }
 
-        plane = new Plane(100, 400);
+        plane = new Plane(0, 0);
+        missionLogic.setupPlane(plane);
+
+        if (missionLogic.getType() == MissionType.EMERGENCY) {
+            missionActive = true;
+        }
 
         StackPane root = new StackPane(canvas);
         Scene scene = new Scene(root);
@@ -54,7 +69,7 @@ public class FlightLab_Main extends Application {
         scene.setOnKeyPressed(this::onKeyPressed);
         scene.setOnKeyReleased(this::onKeyReleased);
 
-        primaryStage.setTitle("Flight Lab - Misja");
+        primaryStage.setTitle("Flight Lab - " + missionLogic.getObjectiveText());
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -68,7 +83,6 @@ public class FlightLab_Main extends Application {
                 if (last == 0) last = now;
                 double dt = (now - last) / 1_000_000_000.0;
                 last = now;
-
                 update(dt);
                 render(gc);
             }
@@ -76,120 +90,43 @@ public class FlightLab_Main extends Application {
         loop.start();
     }
 
-    private void onKeyPressed(KeyEvent e) {
-        KeyCode c = e.getCode();
-        switch (c) {
-            case W -> up = true;
-            case S -> down = true;
-            case A -> left = true;
-            case D -> right = true;
-            case SPACE -> quickClimb = true;
-
-            //Flap Control:
-            case F -> plane.toggleFlaps();
-
-            case ENTER -> {
-                if (gameWon) {
-                    resetGame();
-                } else {
-                    missionActive = !missionActive;
-                    if (missionActive) startTime = System.currentTimeMillis();
-                }
-            }
-            case ESCAPE -> {
-                try {
-                    new MainMenu().start((Stage)((Scene)e.getSource()).getWindow());
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
-            default -> {}
-        }
-    }
-
-    private void onKeyReleased(KeyEvent e) {
-        KeyCode c = e.getCode();
-        switch (c) {
-            case W -> up = false;
-            case S -> down = false;
-            case A -> left = false;
-            case D -> right = false;
-            case SPACE -> quickClimb = false;
-            default -> {}
-        }
-    }
-
-    private void resetGame() {
-        plane = new Plane(100, 400);
-        gameWon = false;
-        missionActive = false;
-        cameraX = 0;
-        startTime = System.currentTimeMillis(); //Time reset
-    }
-
     private void update(double dt) {
-        if (gameWon) return;
+        if (gameWon || gameLost) return;
 
-        //Controls:
+        //Controls
         if (up) plane.turn(-60 * dt);
         if (down) plane.turn(60 * dt);
         if (left) plane.throttle = clamp(plane.throttle - 0.5 * dt, 0, 1);
-        if (right) plane.throttle = clamp(plane.throttle + 0.5 * dt, 0, 1);
+
+        //For emergency mission throttle is blocked (engine failure)
+        if (right) {
+            if (missionLogic.getType() != MissionType.EMERGENCY) {
+                plane.throttle = clamp(plane.throttle + 0.5 * dt, 0, 1);
+            }
+        }
         if (quickClimb) plane.pitch += 20 * dt;
 
-        plane.updatePhysics(dt, windX, windY);
+        //Physics
+        plane.updatePhysics(dt, windX, windY, missionLogic.getType());
 
-        //Ground and braking:
+        //Collision with the ground
         if (plane.y > HEIGHT - 50) {
             plane.y = HEIGHT - 50;
             plane.vy = 0;
             plane.onGround = true;
-
-            //Wheel braking only when the throttle is low
-            if (plane.throttle < 0.1) {
-                plane.vx *= 0.95;
-            }
+            if (plane.throttle < 0.1) plane.vx *= 0.95; //Braking
         } else {
             plane.onGround = false;
         }
 
-        //Upper limit (ceiling)
         if (plane.y < 20) {
             plane.y = 20;
             if (plane.vy < 0) plane.vy = 0;
         }
 
-        //WINNING CONDITION AND SCORING
-        if (plane.x > DESTINATION_X && plane.x < DESTINATION_X + RUNWAY_LENGTH) {
-            if (plane.onGround && plane.getSpeed() < 5.0) {
-                if (!gameWon) {
-                    gameWon = true;
-                    missionActive = false;
-
-                    int basePoints = 50;
-
-                    //1. Bonus for using flaps (20 points)
-                    int flapsBonus = plane.flapsExtended ? 20 : 0;
-
-                    //2. Time Bonus (Max 50 points - time in seconds)
-                    long elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000;
-                    int timeBonus = Math.max(0, 50 - (int)elapsedSeconds); //If flying longer than 50s - the bonus is 0.
-
-                    int totalPoints = basePoints + flapsBonus + timeBonus;
-
-                    Player current = GameData.getInstance().getCurrentPlayer();
-                    if (current != null) {
-                        current.addMissionPoints(totalPoints);
-                        GameData.getInstance().saveData();
-
-                        System.out.println("MISJA UKOŃCZONA");
-                        System.out.println("Baza: " + basePoints);
-                        System.out.println("Bonus Klapy: " + flapsBonus);
-                        System.out.println("Bonus Czas: " + timeBonus + " (Czas: " + elapsedSeconds + "s)");
-                        System.out.println("RAZEM: " + totalPoints);
-                    }
-                }
-            }
+        int points = missionLogic.checkVictory(plane);
+        if (points > 0) {
+            handleVictory(points);
         }
 
         cameraX = Math.max(0, plane.x - 200);
@@ -206,6 +143,76 @@ public class FlightLab_Main extends Application {
             plane.throttle = Math.max(0, plane.throttle - 0.5 * dt);
     }
 
+    private void handleVictory(int points) {
+        gameWon = true;
+        missionActive = false;
+
+        if (plane.flapsExtended && missionLogic.getType() != MissionType.LOW_PASS) {
+            points += 20;
+        }
+
+        Player current = GameData.getInstance().getCurrentPlayer();
+        if (current != null) {
+            current.addMissionPoints(points);
+            GameData.getInstance().saveData();
+            System.out.println("Zadanie wykonane! +" + points + " pkt");
+        }
+    }
+
+    private void handleGameOver(String reason) {
+        if (!gameWon && !gameLost) {
+            gameLost = true;
+            missionActive = false;
+            endMessage = reason;
+        }
+    }
+
+    private void onKeyPressed(KeyEvent e) {
+        KeyCode c = e.getCode();
+        switch (c) {
+            case W -> up = true;
+            case S -> down = true;
+            case A -> left = true;
+            case D -> right = true;
+            case SPACE -> quickClimb = true;
+            case F -> plane.toggleFlaps();
+            case ENTER -> {
+                if (gameWon) {
+                    try {
+                        new MainMenu().start((Stage) ((Scene) e.getSource()).getWindow());
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                } else {
+                    missionActive = !missionActive;
+                    if (missionActive) startTime = System.currentTimeMillis();
+                }
+            }
+            case ESCAPE -> {
+                try {
+                    new MainMenu().start((Stage) ((Scene) e.getSource()).getWindow());
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+            default -> {
+            }
+        }
+    }
+
+    private void onKeyReleased(KeyEvent e) {
+        KeyCode c = e.getCode();
+        switch (c) {
+            case W -> up = false;
+            case S -> down = false;
+            case A -> left = false;
+            case D -> right = false;
+            case SPACE -> quickClimb = false;
+            default -> {
+            }
+        }
+    }
+
     private void render(GraphicsContext g) {
         g.setFill(Color.web("#4986c4"));
         g.fillRect(0, 0, WIDTH, HEIGHT);
@@ -216,10 +223,11 @@ public class FlightLab_Main extends Application {
         g.setFill(Color.web("#266308"));
         g.fillRect(cameraX, HEIGHT - 80, WIDTH, 80);
 
-        int startMarker = (int)(cameraX / 500) * 500;
+        //Grass
+        int startMarker = (int) (cameraX / 500) * 500;
         for (int i = startMarker; i < startMarker + WIDTH + 500; i += 500) {
-            boolean onStart = (i >= 0 && i < RUNWAY_LENGTH);
-            boolean onEnd = (i >= DESTINATION_X && i < DESTINATION_X + RUNWAY_LENGTH);
+            boolean onStart = (i >= 0 && i < missionLogic.getRunwayLen());
+            boolean onEnd = (i >= missionLogic.getDestX() && i < missionLogic.getDestX() + missionLogic.getRunwayLen());
             if (!onStart && !onEnd) {
                 g.setFill(Color.LIGHTGREEN);
                 g.fillRect(i, HEIGHT - 80, 20, 80);
@@ -227,12 +235,21 @@ public class FlightLab_Main extends Application {
         }
 
         drawRunway(g, 0);
-        drawRunway(g, DESTINATION_X);
+        drawRunway(g, missionLogic.getDestX());
+
+        //Yellow zone for precision mission
+        if (missionLogic.getType() == MissionType.PRECISION) {
+            g.setFill(Color.YELLOW);
+
+            g.setGlobalAlpha(0.5);
+            g.fillRect(5200, HEIGHT - 80, 100, 80);
+            g.setGlobalAlpha(1.0);
+        }
 
         g.setFill(Color.RED);
-        g.fillRect(DESTINATION_X, HEIGHT - 150, 10, 70);
-        g.fillPolygon(new double[]{DESTINATION_X, DESTINATION_X+50, DESTINATION_X},
-                new double[]{HEIGHT-150, HEIGHT-135, HEIGHT-120}, 3);
+        g.fillRect(missionLogic.getDestX(), HEIGHT - 150, 10, 70);
+        g.fillPolygon(new double[]{missionLogic.getDestX(), missionLogic.getDestX() + 50, missionLogic.getDestX()},
+                new double[]{HEIGHT - 150, HEIGHT - 135, HEIGHT - 120}, 3);
 
         drawPlane(g);
         g.restore();
@@ -245,18 +262,18 @@ public class FlightLab_Main extends Application {
             g.fillRect(0, 0, WIDTH, HEIGHT);
             g.setFill(Color.LIME);
             g.setFont(Font.font("Arial", 48));
-            g.fillText("MISJA UKOŃCZONA!", 280, 300);
+            g.fillText("MISSION COMPLETE!", 280, 300);
             g.setFill(Color.WHITE);
             g.setFont(Font.font("Arial", 24));
-            g.fillText("Punkty zapisane. ENTER = Restart", 320, 350);
+            g.fillText("Punkty zapisane. ENTER = Powrót", 320, 350);
         }
     }
 
     private void drawRunway(GraphicsContext g, double startX) {
         g.setFill(Color.DARKGRAY);
-        g.fillRect(startX, HEIGHT - 80, RUNWAY_LENGTH, 80);
+        g.fillRect(startX, HEIGHT - 80, missionLogic.getRunwayLen(), 80);
         g.setFill(Color.WHITE);
-        for (double j = startX; j < startX + RUNWAY_LENGTH; j += 100) {
+        for (double j = startX; j < startX + missionLogic.getRunwayLen(); j += 100) {
             g.fillRect(j, HEIGHT - 45, 60, 10);
         }
     }
@@ -280,11 +297,10 @@ public class FlightLab_Main extends Application {
     private void drawHUD(GraphicsContext g) {
         g.setFill(Color.rgb(0, 0, 0, 0.6));
         g.fillRoundRect(10, 10, 260, 140, 8, 8);
-
         g.setFill(Color.WHITE);
         g.setFont(Font.font(14));
 
-        double dist = Math.max(0, DESTINATION_X - plane.x);
+        double dist = Math.max(0, missionLogic.getDestX() - plane.x);
 
         g.fillText(String.format("Goal Dist: %.0f m", dist), 20, 34);
         g.fillText(String.format("Speed    : %.1f m/s", plane.getSpeed()), 20, 56);
@@ -310,12 +326,12 @@ public class FlightLab_Main extends Application {
     private void drawMissionInfo(GraphicsContext g) {
         if (gameWon) return;
 
-        g.setFill(Color.rgb(255,255,255,0.9));
+        g.setFill(Color.rgb(255, 255, 255, 0.9));
         g.setFont(Font.font(16));
-        g.fillText(missionActive ? "Mission: LAND AT DESTINATION" : "Mission: INACTIVE (Press ENTER)", 300, 30);
+        g.fillText("Misja: " + missionLogic.getObjectiveText(), 300, 30);
 
         g.setFont(Font.font(12));
-        g.fillText("Controls: W/S pitch, A/D throttle, F flaps", 300, 50);
+        g.fillText("Sterowanie: W/S (kąt), A/D (gaz), F (klapy)", 300, 50);
 
         if (plane.fuel < 20) {
             g.setFill(Color.RED);
@@ -327,7 +343,7 @@ public class FlightLab_Main extends Application {
         return Math.max(a, Math.min(b, v));
     }
 
-    private static class Plane {
+    public static class Plane {
         double x, y;
         double vx = 0, vy = 0;
         double angle = 0;
@@ -335,7 +351,6 @@ public class FlightLab_Main extends Application {
         double throttle = 0.2;
         double fuel = 100;
         boolean onGround = false;
-
         boolean flapsExtended = false;
 
         Plane(double x, double y) {
@@ -355,30 +370,20 @@ public class FlightLab_Main extends Application {
             return Math.hypot(vx, vy);
         }
 
-        void updatePhysics(double dt, double windX, double windY) {
+        void updatePhysics(double dt, double windX, double windY, MissionType mission) {
             double rad = Math.toRadians(angle);
-            double thrust = 200 * throttle;
+            double maxThrust = (mission == MissionType.EMERGENCY) ? 120 : 200;
+
+            double thrust = maxThrust * throttle;
             double ax = Math.cos(rad) * thrust;
             double ay = Math.sin(rad) * thrust;
 
             double forwardSpeed = getSpeed();
-
-            //FLAP PHYSICS
-            //The basis of lift force:
             double lift = 50 * (forwardSpeed / 50.0) * (1 + pitch * 0.5);
-
-            //If the flaps are extended:
-            if (flapsExtended) {
-                lift *= 1.5; //Increasing lift by 50%
-            }
+            if (flapsExtended) lift *= 1.5;
 
             double gravity = 9.81 * 20;
-
-            //AIR RESISTANCE:
-            double dragFactor = 0.5;
-            if (flapsExtended) {
-                dragFactor = 0.9; //Flaps significantly increase drag
-            }
+            double dragFactor = flapsExtended ? 0.9 : 0.5;
 
             double dragX = -vx * dragFactor;
             double dragY = -vy * dragFactor;
@@ -389,12 +394,11 @@ public class FlightLab_Main extends Application {
             x += vx * dt;
             y += vy * dt;
 
-            if (x < 0) { x = 0; vx = 0; }
+            if (x < 0) {
+                x = 0;
+                vx = 0;
+            }
             pitch *= 0.96;
         }
-    }
-
-    public static void main(String[] args) {
-        launch(args);
     }
 }

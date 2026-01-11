@@ -7,6 +7,8 @@ module com.example.flightlab {
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.bootstrapfx.core;
     requires com.almasb.fxgl.all;
+    requires java.sql;
+    requires javafx.media;
 
     opens com.example.flightlab to javafx.fxml;
     exports com.example.flightlab;

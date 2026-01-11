@@ -33,6 +33,7 @@ application {
 javafx {
     version = "17.0.14"
     modules = listOf("javafx.controls", "javafx.fxml", "javafx.media")
+    configuration = "implementation"
 }
 
 dependencies {

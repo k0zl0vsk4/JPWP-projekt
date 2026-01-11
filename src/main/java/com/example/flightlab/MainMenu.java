@@ -4,6 +4,7 @@ import com.example.flightlab.GameData;
 import com.example.flightlab.Player;
 import com.example.flightlab.Question;
 import com.example.flightlab.QuestionDataBase;
+import com.example.flightlab.MissionType;
 
 import javafx.application.Application;
 import javafx.geometry.Pos;
@@ -26,12 +27,11 @@ import java.util.List;
 public class MainMenu extends Application {
 
     private Stage window;
-    private Scene loginScene, menuScene, quizScene, scoresScene;
+
+    private Scene loginScene, menuScene, quizScene, scoresScene, missionSelectScene;
 
     private int quizIndex = 0;
     private int sessionScore = 0;
-
-    // Lista pytań aktywnych w tej sesji
     private List<Question> activeQuestions = new ArrayList<>();
 
     @Override
@@ -40,6 +40,7 @@ public class MainMenu extends Application {
         window.setTitle("FlightLab - System");
 
         createLoginScene();
+        createMissionSelectScene();
         createMenuScene();
         createScoresScene();
 
@@ -58,7 +59,7 @@ public class MainMenu extends Application {
 
         TextField nameInput = new TextField();
         nameInput.setMaxWidth(300);
-        nameInput.setPromptText("Wpisz imię...");
+        nameInput.setPromptText("Wpisz imię/nazwę...");
 
         Button loginButton = new Button("ZALOGUJ / STWÓRZ");
         loginButton.setPrefWidth(200);
@@ -89,10 +90,10 @@ public class MainMenu extends Application {
         title.setFont(Font.font(36));
         title.setTextFill(Color.WHITE);
 
-        Button simButton = new Button("Start Symulatora");
+        Button simButton = new Button("Centrum Misji (WYBÓR)");
         Button quizButton = new Button("Panel Edukacyjny (Quiz)");
         Button scoresButton = new Button("Tabela Wyników");
-        Button changeUserButton = new Button("Wyloguj / Zmień Gracza");
+        Button changeUserButton = new Button("Wyloguj");
         Button exitButton = new Button("Wyjście");
 
         simButton.setPrefWidth(300);
@@ -101,7 +102,8 @@ public class MainMenu extends Application {
         changeUserButton.setPrefWidth(300);
         exitButton.setPrefWidth(300);
 
-        simButton.setOnAction(e -> startSimulation());
+        simButton.setOnAction(e -> window.setScene(missionSelectScene));
+
         quizButton.setOnAction(e -> startQuiz());
         scoresButton.setOnAction(e -> window.setScene(scoresScene));
         changeUserButton.setOnAction(e -> window.setScene(loginScene));
@@ -109,6 +111,35 @@ public class MainMenu extends Application {
 
         menu.getChildren().addAll(title, simButton, quizButton, scoresButton, changeUserButton, exitButton);
         menuScene = new Scene(menu, 1000, 700);
+    }
+
+    private void createMissionSelectScene() {
+        VBox layout = new VBox(20);
+        layout.setAlignment(Pos.CENTER);
+        layout.setStyle("-fx-background-color: #202020;");
+
+        Label label = new Label("WYBIERZ ZADANIE");
+        label.setTextFill(Color.LIGHTBLUE);
+        label.setFont(Font.font(30));
+
+        Button btn1 = new Button("1. Lot Swobodny / Trening");
+        Button btn2 = new Button("2. Precyzja (Żółta strefa)");
+        Button btn3 = new Button("3. Awaria Silnika (Start w powietrzu)");
+        Button btn4 = new Button("4. Low Pass (Przelot niski)");
+        Button backBtn = new Button("Powrót do Menu");
+
+        btn1.setPrefWidth(400); btn2.setPrefWidth(400);
+        btn3.setPrefWidth(400); btn4.setPrefWidth(400); backBtn.setPrefWidth(200);
+
+        btn1.setOnAction(e -> new FlightLab_Main(MissionType.NORMAL).start(window));
+        btn2.setOnAction(e -> new FlightLab_Main(MissionType.PRECISION).start(window));
+        btn3.setOnAction(e -> new FlightLab_Main(MissionType.EMERGENCY).start(window));
+        btn4.setOnAction(e -> new FlightLab_Main(MissionType.LOW_PASS).start(window));
+
+        backBtn.setOnAction(e -> window.setScene(menuScene));
+
+        layout.getChildren().addAll(label, btn1, btn2, btn3, btn4, backBtn);
+        missionSelectScene = new Scene(layout, 1000, 700);
     }
 
     private void createScoresScene() {
@@ -154,13 +185,12 @@ public class MainMenu extends Application {
         sessionScore = 0;
         activeQuestions.clear();
 
-        //Taking 10 random questions from database for quiz:
         List<Question> allQuestions = QuestionDataBase.getQuestions();
-
         Collections.shuffle(allQuestions);
 
         int numberOfQuestions = Math.min(allQuestions.size(), 10);
-        for (int i = 0; i < numberOfQuestions; i++) {
+        for (int i = 0; i < numberOfQuestions; i++)
+        {
             activeQuestions.add(allQuestions.get(i));
         }
 
@@ -170,7 +200,9 @@ public class MainMenu extends Application {
     private void showQuizQuestion() {
         if (this.quizIndex >= this.activeQuestions.size()) {
             this.showQuizSummary();
-        } else {
+        }
+        else
+        {
             Question q = this.activeQuestions.get(this.quizIndex);
 
             VBox box = new VBox(20.0);
@@ -219,10 +251,7 @@ public class MainMenu extends Application {
             Button c = new Button("C: " + q.c);
             Button d = new Button("D: " + q.d);
 
-            a.setPrefWidth(400);
-            b.setPrefWidth(400);
-            c.setPrefWidth(400);
-            d.setPrefWidth(400);
+            a.setPrefWidth(400); b.setPrefWidth(400); c.setPrefWidth(400); d.setPrefWidth(400);
 
             a.setOnAction(e -> checkAnswer(1));
             b.setOnAction(e -> checkAnswer(2));
@@ -242,7 +271,8 @@ public class MainMenu extends Application {
         }
     }
 
-    private void checkAnswer(int chosen) {
+    private void checkAnswer(int chosen)
+    {
         Question currentQ = this.activeQuestions.get(this.quizIndex);
         boolean isCorrect = (chosen == currentQ.correct);
 
@@ -257,7 +287,8 @@ public class MainMenu extends Application {
         showFeedback(isCorrect, currentQ);
     }
 
-    private void showFeedback(boolean correct, Question q) {
+    private void showFeedback(boolean correct, Question q)
+    {
         VBox feedbackBox = new VBox(20.0);
         feedbackBox.setAlignment(Pos.CENTER);
         feedbackBox.setStyle(correct ? "-fx-background-color: #27A65B;" : "-fx-background-color: #C0392B;");
@@ -314,12 +345,6 @@ public class MainMenu extends Application {
 
         box.getChildren().addAll(result, totalInfo, back);
         window.setScene(new Scene(box, 1000, 700));
-    }
-
-    private void startSimulation() {
-        try {
-            new FlightLab_Main().start(window);
-        } catch (Exception e) { e.printStackTrace(); }
     }
 
     private void updateTitle() {
